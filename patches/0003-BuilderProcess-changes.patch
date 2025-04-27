@@ -267,8 +267,8 @@ index b99d41e0..b42a23e0 100644
          }
          List<BlockState> desirableOnHotbar = new ArrayList<>();
          Optional<Placement> toPlace = searchForPlacables(bcc, desirableOnHotbar);
--        if (toPlace.isPresent() && isSafeToCancel && ctx.player().isOnGround() && ticks <= 0) {
-+        if (!AltoClefSettings.getInstance().isInteractionPaused() && toPlace.isPresent() && isSafeToCancel && ctx.player().isOnGround() && ticks <= 0) {
+-        if (toPlace.isPresent() && isSafeToCancel && ctx.player().onGround() && ticks <= 0) {
++        if (!AltoClefSettings.getInstance().isInteractionPaused() && toPlace.isPresent() && isSafeToCancel && ctx.player().onGround() && ticks <= 0) {
              Rotation rot = toPlace.get().rot;
              baritone.getLookBehavior().updateTarget(rot, true);
              ctx.player().getInventory().selected = toPlace.get().hotbarSelection;
