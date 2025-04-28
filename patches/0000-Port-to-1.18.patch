@@ -1,0 +1,51 @@
+From e72e4da51a412d2aa6b8e9ea9045ec4144f14188 Mon Sep 17 00:00:00 2001
+From: MiranCZ <miraancz@gmail.com>
+Date: Mon, 28 Apr 2025 14:24:27 +0200
+Subject: [PATCH] Port to 1.18
+
+---
+ gradle.properties                                      | 6 +++---
+ src/api/java/baritone/api/utils/BlockOptionalMeta.java | 3 ++-
+ 2 files changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/gradle.properties b/gradle.properties
+index 50eed021..15452ec0 100644
+--- a/gradle.properties
++++ b/gradle.properties
+@@ -4,9 +4,9 @@ mod_version=1.8.6
+ maven_group=baritone
+ archives_base_name=baritone
+ 
+-minecraft_version=1.18.2
+-forge_version=1.18.2-40.0.0
+-fabric_version=0.13.1
++minecraft_version=1.18
++forge_version=1.18-40.0.0
++fabric_version=0.12.5
+ 
+ # # un comment for forge debugging default (as opposed to fabric)
+ # baritone.forge_build=true
+diff --git a/src/api/java/baritone/api/utils/BlockOptionalMeta.java b/src/api/java/baritone/api/utils/BlockOptionalMeta.java
+index bd0629da..9d8481ee 100644
+--- a/src/api/java/baritone/api/utils/BlockOptionalMeta.java
++++ b/src/api/java/baritone/api/utils/BlockOptionalMeta.java
+@@ -29,6 +29,7 @@ import net.minecraft.server.packs.PackType;
+ import net.minecraft.server.packs.repository.PackRepository;
+ import net.minecraft.server.packs.repository.ServerPacksSource;
+ import net.minecraft.server.packs.resources.ReloadableResourceManager;
++import net.minecraft.server.packs.resources.SimpleReloadableResourceManager;
+ import net.minecraft.util.Unit;
+ import net.minecraft.world.level.block.state.properties.Property;
+ import net.minecraft.world.item.Item;
+@@ -196,7 +197,7 @@ public final class BlockOptionalMeta {
+             PackRepository rpl = new PackRepository(PackType.SERVER_DATA, new ServerPacksSource());
+             rpl.reload();
+             PackResources thePack = rpl.getAvailablePacks().iterator().next().open();
+-            ReloadableResourceManager resourceManager = new ReloadableResourceManager(PackType.SERVER_DATA);
++            ReloadableResourceManager resourceManager = new SimpleReloadableResourceManager(PackType.SERVER_DATA);
+             manager = new LootTables(predicate);
+             resourceManager.registerReloadListener(manager);
+             try {
+-- 
+2.45.1.windows.1
+
