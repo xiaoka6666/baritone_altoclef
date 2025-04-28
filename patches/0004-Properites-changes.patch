@@ -14,8 +14,8 @@ index 50eed021..814cc22c 100644
 @@ -1,6 +1,6 @@
  org.gradle.jvmargs=-Xmx2048M
  
--mod_version=1.8.6
-+mod_version=1.18.2
+-mod_version=1.7.3
++mod_version=1.17.1
  maven_group=baritone
  archives_base_name=baritone
  

@@ -1,0 +1,74 @@
+From 0e10bf7b7d23a76e645d4a9d9054f6df895d5b8e Mon Sep 17 00:00:00 2001
+From: MiranCZ <miraancz@gmail.com>
+Date: Mon, 28 Apr 2025 15:44:17 +0200
+Subject: [PATCH] Fix command suggestions
+
+---
+ .../mixins/MixinCommandSuggestionHelper.java  | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/src/launch/java/baritone/launch/mixins/MixinCommandSuggestionHelper.java b/src/launch/java/baritone/launch/mixins/MixinCommandSuggestionHelper.java
+index 63331502..bd9b2b53 100644
+--- a/src/launch/java/baritone/launch/mixins/MixinCommandSuggestionHelper.java
++++ b/src/launch/java/baritone/launch/mixins/MixinCommandSuggestionHelper.java
+@@ -19,9 +19,12 @@ package baritone.launch.mixins;
+ 
+ import baritone.api.BaritoneAPI;
+ import baritone.api.event.events.TabCompleteEvent;
++import com.mojang.brigadier.ParseResults;
+ import com.mojang.brigadier.context.StringRange;
+ import com.mojang.brigadier.suggestion.Suggestion;
+ import com.mojang.brigadier.suggestion.Suggestions;
++import net.minecraft.commands.SharedSuggestionProvider;
++import org.jetbrains.annotations.Nullable;
+ import org.spongepowered.asm.mixin.Final;
+ import org.spongepowered.asm.mixin.Mixin;
+ import org.spongepowered.asm.mixin.Shadow;
+@@ -41,7 +44,7 @@ import net.minecraft.client.gui.components.EditBox;
+  * @since 10/9/2019
+  */
+ @Mixin(CommandSuggestions.class)
+-public class MixinCommandSuggestionHelper {
++public abstract class MixinCommandSuggestionHelper {
+ 
+     @Shadow
+     @Final
+@@ -54,6 +57,14 @@ public class MixinCommandSuggestionHelper {
+     @Shadow
+     private CompletableFuture<Suggestions> pendingSuggestions;
+ 
++    @Shadow public abstract void showSuggestions(boolean bl);
++
++    @Shadow public abstract void setAllowSuggestions(boolean bl);
++
++    @Shadow @Nullable private ParseResults<SharedSuggestionProvider> currentParse;
++
++    @Shadow boolean keepSuggestions;
++
+     @Inject(
+             method = "updateCommandInfo",
+             at = @At("HEAD"),
+@@ -79,7 +90,10 @@ public class MixinCommandSuggestionHelper {
+ 
+             if (event.completions.length == 0) {
+                 this.pendingSuggestions = Suggestions.empty();
++                this.input.setSuggestion(null);
++                setAllowSuggestions(false);
+             } else {
++                setAllowSuggestions(true);
+                 int offset = this.input.getValue().endsWith(" ")
+                         ? this.input.getCursorPosition()
+                         : this.input.getValue().lastIndexOf(" ") + 1; // If there is no space this is still 0 haha yes
+@@ -94,6 +108,9 @@ public class MixinCommandSuggestionHelper {
+ 
+                 this.pendingSuggestions = new CompletableFuture<>();
+                 this.pendingSuggestions.complete(suggestions);
++                if (!this.keepSuggestions) {
++                    this.showSuggestions(false);
++                }
+             }
+         }
+     }
+-- 
+2.45.1.windows.1
+
