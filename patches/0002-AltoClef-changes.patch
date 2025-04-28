@@ -170,8 +170,8 @@ index 0911c6c0..320cbacb 100644
 +        }
 +        this.estimatedCostToGoal = AltoClefSettings.getInstance().applyGlobalHeuristic(originalCost, x, y, z);
          if (Double.isNaN(estimatedCostToGoal)) {
-             throw new IllegalStateException(String.format(
-                     "%s calculated implausible heuristic NaN at %s %s %s",
+             throw new IllegalStateException(goal + " calculated implausible heuristic");
+         }
 diff --git a/src/main/java/baritone/pathing/movement/CalculationContext.java b/src/main/java/baritone/pathing/movement/CalculationContext.java
 index e84188a7..2e05e6fd 100644
 --- a/src/main/java/baritone/pathing/movement/CalculationContext.java
@@ -185,7 +185,7 @@ index e84188a7..2e05e6fd 100644
  import baritone.api.pathing.movement.ActionCosts;
  import baritone.cache.WorldData;
 @@ -34,6 +35,7 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
- import net.minecraft.world.item.enchantment.Enchantments;
+ import net.minecraft.world.item.enchantment.effects.EnchantmentAttributeEffect;
  import net.minecraft.world.level.Level;
  import net.minecraft.world.level.block.Block;
 +import net.minecraft.world.level.block.EndPortalFrameBlock;
@@ -207,7 +207,7 @@ index e84188a7..2e05e6fd 100644
          this.allowParkour = Baritone.settings().allowParkour.value;
          this.allowParkourPlace = Baritone.settings().allowParkourPlace.value;
 @@ -167,6 +169,9 @@ public class CalculationContext {
-         if (!Baritone.settings().allowPlaceInFluidsFlow.value && !current.getFluidState().isEmpty() && !current.getFluidState().isSource()) {
+         if (!worldBorder.canPlaceAt(x, z)) {
              return COST_INF;
          }
 +        if (AltoClefSettings.getInstance().shouldAvoidPlacingAt(x, y, z)) {
@@ -496,9 +496,9 @@ index ff905c02..d8f25685 100644
 +            return true;
 +        }
 +
-         BlockState state = ctx.bsi.get0(pos);
-         if (MovementHelper.getMiningDurationTicks(ctx, pos.getX(), pos.getY(), pos.getZ(), state, true) >= COST_INF) {
+         if (MovementHelper.getMiningDurationTicks(ctx, pos.getX(), pos.getY(), pos.getZ(), ctx.bsi.get0(pos), true) >= COST_INF) {
              return false;
+         }
 diff --git a/src/main/java/baritone/utils/InputOverrideHandler.java b/src/main/java/baritone/utils/InputOverrideHandler.java
 index 38a32f51..7b9b7bc1 100755
 --- a/src/main/java/baritone/utils/InputOverrideHandler.java
@@ -532,8 +532,8 @@ index ed4b166c..a40ef0fb 100644
  import baritone.Baritone;
 +import baritone.altoclef.AltoClefSettings;
  import net.minecraft.client.player.LocalPlayer;
+ import net.minecraft.core.Holder;
  import net.minecraft.world.effect.MobEffects;
- import net.minecraft.world.item.ItemStack;
 @@ -114,6 +115,8 @@ public class ToolSet {
          If we actually want know what efficiency our held item has instead of the best one
          possible, this lets us make pathing depend on the actual tool to be used (if auto tool is disabled)
@@ -558,7 +558,7 @@ index ed4b166c..a40ef0fb 100644
              boolean silkTouch = hasSilkTouch(itemStack);
              if (speed > highestSpeed) {
 @@ -195,7 +200,9 @@ public class ToolSet {
-                 speed += effLevel * effLevel + 1;
+                 }
              }
          }
 -
