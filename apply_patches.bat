@@ -7,7 +7,7 @@ echo Applying patches...
 
 for %%F in (..\patches\*.patch) do (
     echo Applying %%F
-    git apply "%%F"
+    git apply --ignore-space-change --ignore-whitespace --3way "%%F"
     if errorlevel 1 (
         echo Failed to apply %%F
         exit /b 1
