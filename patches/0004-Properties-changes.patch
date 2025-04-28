@@ -1,0 +1,24 @@
+From e16f15d24c1998da7aecd3d439461da0c7a65a1a Mon Sep 17 00:00:00 2001
+From: MiranCZ <miraancz@gmail.com>
+Date: Mon, 28 Apr 2025 17:24:44 +0200
+Subject: [PATCH] Properties changes
+
+---
+ gradle.properties | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gradle.properties b/gradle.properties
+index 845c524f..2cb807f4 100644
+--- a/gradle.properties
++++ b/gradle.properties
+@@ -3,6 +3,6 @@
+ available_loaders=fabric,forge,tweaker
+ 
+-mod_version=1.10.2
++mod_version=1.20.2
+ maven_group=baritone
+ archives_base_name=baritone
+ 
+-- 
+2.45.1.windows.1
+
