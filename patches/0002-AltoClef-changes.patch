@@ -170,8 +170,8 @@ index 0911c6c0..320cbacb 100644
 +        }
 +        this.estimatedCostToGoal = AltoClefSettings.getInstance().applyGlobalHeuristic(originalCost, x, y, z);
          if (Double.isNaN(estimatedCostToGoal)) {
-             throw new IllegalStateException(goal + " calculated implausible heuristic");
-         }
+             throw new IllegalStateException(String.format(
+                     "%s calculated implausible heuristic NaN at %s %s %s",
 diff --git a/src/main/java/baritone/pathing/movement/CalculationContext.java b/src/main/java/baritone/pathing/movement/CalculationContext.java
 index e84188a7..2e05e6fd 100644
 --- a/src/main/java/baritone/pathing/movement/CalculationContext.java
@@ -207,7 +207,7 @@ index e84188a7..2e05e6fd 100644
          this.allowParkour = Baritone.settings().allowParkour.value;
          this.allowParkourPlace = Baritone.settings().allowParkourPlace.value;
 @@ -167,6 +169,9 @@ public class CalculationContext {
-         if (!worldBorder.canPlaceAt(x, z)) {
+         if (!Baritone.settings().allowPlaceInFluidsFlow.value && !current.getFluidState().isEmpty() && !current.getFluidState().isSource()) {
              return COST_INF;
          }
 +        if (AltoClefSettings.getInstance().shouldAvoidPlacingAt(x, y, z)) {
@@ -496,9 +496,9 @@ index ff905c02..d8f25685 100644
 +            return true;
 +        }
 +
-         if (MovementHelper.getMiningDurationTicks(ctx, pos.getX(), pos.getY(), pos.getZ(), ctx.bsi.get0(pos), true) >= COST_INF) {
+         BlockState state = ctx.bsi.get0(pos);
+         if (MovementHelper.getMiningDurationTicks(ctx, pos.getX(), pos.getY(), pos.getZ(), state, true) >= COST_INF) {
              return false;
-         }
 diff --git a/src/main/java/baritone/utils/InputOverrideHandler.java b/src/main/java/baritone/utils/InputOverrideHandler.java
 index 38a32f51..7b9b7bc1 100755
 --- a/src/main/java/baritone/utils/InputOverrideHandler.java
