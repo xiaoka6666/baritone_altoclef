@@ -1,0 +1,30 @@
+From b0e7256cf53468ea4d7a29f4fc4662124f34c31d Mon Sep 17 00:00:00 2001
+From: MiranCZ <miraancz@gmail.com>
+Date: Mon, 28 Apr 2025 14:16:39 +0200
+Subject: [PATCH 4/4] Properties changes
+
+---
+ gradle.properties | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/gradle.properties b/gradle.properties
+index 50eed021..814cc22c 100644
+--- a/gradle.properties
++++ b/gradle.properties
+@@ -1,6 +1,6 @@
+ org.gradle.jvmargs=-Xmx2048M
+ 
+-mod_version=1.8.6
++mod_version=1.18.2
+ maven_group=baritone
+ archives_base_name=baritone
+ 
+@@ -11,3 +11,4 @@ fabric_version=0.13.1
+ # # un comment for forge debugging default (as opposed to fabric)
+ # baritone.forge_build=true
+ # loom.platform=forge
++baritone.fabric_build = true
+\ No newline at end of file
+-- 
+2.45.1.windows.1
+

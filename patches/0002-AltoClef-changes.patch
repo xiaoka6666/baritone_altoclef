@@ -1,7 +1,7 @@
 From 5577990e9263295e0361259ae2139bb72186801d Mon Sep 17 00:00:00 2001
 From: MiranCZ <miraancz@gmail.com>
 Date: Sun, 27 Apr 2025 18:38:02 +0200
-Subject: [PATCH 2/3] AltoClef changes
+Subject: [PATCH 2/4] AltoClef changes
 
 ---
  .../baritone/api/process/IBuilderProcess.java |  4 +++

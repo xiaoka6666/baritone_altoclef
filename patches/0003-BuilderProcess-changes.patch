@@ -1,7 +1,7 @@
 From 4ae02874d133793410c125bf44833999e1c7d37f Mon Sep 17 00:00:00 2001
 From: MiranCZ <miraancz@gmail.com>
 Date: Sun, 27 Apr 2025 18:48:43 +0200
-Subject: [PATCH 3/3] BuilderProcess changes
+Subject: [PATCH 3/4] BuilderProcess changes
 
 ---
  .../java/baritone/process/BuilderProcess.java | 234 +++++++++++++++++-
