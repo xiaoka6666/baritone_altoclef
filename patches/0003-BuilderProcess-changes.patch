@@ -41,7 +41,7 @@ index b99d41e0..b42a23e0 100644
      private List<BlockState> approxPlaceable;
      public int stopAtHeight = 0;
 +    private final Map<BlockState, Integer> protectedItems = new HashMap<>();
-+    private final Function<Map.Entry<Property<?>, Comparable<?>>, PropertyContainer> PROPERTY_ENTRY_TO_STRING_FUNCTION = new Function<>() {
++    private final Function<Map.Entry<Property<?>, Comparable<?>>, PropertyContainer> PROPERTY_ENTRY_TO_STRING_FUNCTION = new Function<Map.Entry<Property<?>, Comparable<?>>, PropertyContainer>() {
 +        public PropertyContainer apply(Map.Entry<Property<?>, Comparable<?>> entry) {
 +            if (entry == null) {
 +                return null;
@@ -67,7 +67,7 @@ index b99d41e0..b42a23e0 100644
          super(baritone);
      }
  
-+    private Vec3i schemSize;
++    private Vector3i schemSize;
 +    private boolean fromAltoclefFinished;
 +    private Map<BlockPos, HistoryInfo> blockBreakHistory = new HashMap<>();
 +
@@ -103,7 +103,7 @@ index b99d41e0..b42a23e0 100644
 +
 +
      @Override
-     public void build(String name, ISchematic schematic, Vec3i origin) {
+     public void build(String name, ISchematic schematic, Vector3i origin) {
 +        //Shouldn't get initially called
 +        if (this.fromAltoclef && this.stateStack.isEmpty()) {
 +            pushState();
@@ -121,7 +121,7 @@ index b99d41e0..b42a23e0 100644
 +        } else {
 +            missing = new HashMap<>();
 +        }
-+        this.schemSize = new Vec3i(schematic.widthX(), schematic.heightY(), schematic.lengthZ());
++        this.schemSize = new Vector3i(schematic.widthX(), schematic.heightY(), schematic.lengthZ());
 +        this.fromAltoclefFinished = false;
 +        this.fromAltoclef = false;
 +    }
@@ -145,14 +145,14 @@ index b99d41e0..b42a23e0 100644
 +        }
 +        this.fromAltoclef = (boolean) stateStack.pop();
 +        this.fromAltoclefFinished = (boolean) stateStack.pop();
-+        this.schemSize = (Vec3i) stateStack.pop();
++        this.schemSize = (Vector3i) stateStack.pop();
 +        this.missing = (Map<BlockState, Integer>) stateStack.pop();
 +        this.active = (boolean) stateStack.pop();
 +        this.observedCompleted = (LongOpenHashSet) stateStack.pop();
 +        this.numRepeats = (int) stateStack.pop();
 +        this.layer = (int) stateStack.pop();
 +        this.paused = (boolean) stateStack.pop();
-+        this.origin = (Vec3i) stateStack.pop();
++        this.origin = (Vector3i) stateStack.pop();
 +        this.realSchematic = (ISchematic) stateStack.pop();
 +        this.schematic = (ISchematic) stateStack.pop();
 +        this.name = (String) stateStack.pop();
@@ -200,7 +200,7 @@ index b99d41e0..b42a23e0 100644
      public boolean placementPlausible(BlockPos pos, BlockState state) {
 +        if (state == null) return false;
          VoxelShape voxelshape = state.getCollisionShape(ctx.world(), pos);
-         return voxelshape.isEmpty() || ctx.world().isUnobstructed(null, voxelshape.move(pos.getX(), pos.getY(), pos.getZ()));
+         return voxelshape.isEmpty() || ctx.world().checkNoEntityCollision(null, voxelshape.withOffset(pos.getX(), pos.getY(), pos.getZ()));
      }
 @@ -394,6 +530,20 @@ public final class BuilderProcess extends BaritoneProcessHelper implements IBuil
          return Optional.empty();
@@ -220,9 +220,9 @@ index b99d41e0..b42a23e0 100644
 +    }
 +
 +
-     private OptionalInt hasAnyItemThatWouldPlace(BlockState desired, HitResult result, Rotation rot) {
+     private OptionalInt hasAnyItemThatWouldPlace(BlockState desired, RayTraceResult result, Rotation rot) {
          for (int i = 0; i < 9; i++) {
-             ItemStack stack = ctx.player().getInventory().items.get(i);
+             ItemStack stack = ctx.player().inventory.mainInventory.get(i);
 @@ -451,8 +604,19 @@ public final class BuilderProcess extends BaritoneProcessHelper implements IBuil
          return onTick(calcFailed, isSafeToCancel, 0);
      }
@@ -276,9 +276,9 @@ index b99d41e0..b42a23e0 100644
 +        if (!AltoClefSettings.getInstance().isInteractionPaused() && toPlace.isPresent() && isSafeToCancel && ctx.player().isOnGround() && ticks <= 0) {
              Rotation rot = toPlace.get().rot;
              baritone.getLookBehavior().updateTarget(rot, true);
-             ctx.player().getInventory().selected = toPlace.get().hotbarSelection;
+             ctx.player().inventory.currentItem = toPlace.get().hotbarSelection;
 @@ -573,10 +743,11 @@ public final class BuilderProcess extends BaritoneProcessHelper implements IBuil
-             if ((ctx.isLookingAt(toPlace.get().placeAgainst) && ((BlockHitResult) ctx.objectMouseOver()).getDirection().equals(toPlace.get().side)) || ctx.playerRotations().isReallyCloseTo(rot)) {
+             if ((ctx.isLookingAt(toPlace.get().placeAgainst) && ((BlockRayTraceResult) ctx.objectMouseOver()).getFace().equals(toPlace.get().side)) || ctx.playerRotations().isReallyCloseTo(rot)) {
                  baritone.getInputOverrideHandler().setInputForceState(Input.CLICK_RIGHT, true);
              }
 +            stopProtectItemOfMissing();
@@ -308,7 +308,7 @@ index b99d41e0..b42a23e0 100644
 +    }
 +
 +    private boolean isDefaultState(final BlockState state) {
-+        final List<PropertyContainer> propertyContainers = state.getValues().entrySet().stream().map(PROPERTY_ENTRY_TO_STRING_FUNCTION).toList();
++        final List<PropertyContainer> propertyContainers = state.getValues().entrySet().stream().map(PROPERTY_ENTRY_TO_STRING_FUNCTION).collect(Collectors.toList());
 +        for (final PropertyContainer container : propertyContainers) {
 +            if (container.getPropertyKey().equals("part") && container.getPropertyValue().equals("head")) {
 +                return false;

@@ -42,7 +42,7 @@ index ed544302..5b5a099a 100644
  
      private RayTraceUtils() {}
  
-+    public static ClipContext.Fluid fluidHandling = ClipContext.Fluid.NONE;
++    public static RayTraceContext.FluidMode fluidHandling = RayTraceContext.FluidMode.NONE;
 +
      /**
       * Performs a block raytrace with the specified rotations. This should only be used when
@@ -51,11 +51,11 @@ index ed544302..5b5a099a 100644
                  direction.y * blockReachDistance,
                  direction.z * blockReachDistance
          );
--        return entity.level.clip(new ClipContext(start, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, entity));
-+        return entity.level.clip(new ClipContext(start, end, ClipContext.Block.OUTLINE, fluidHandling, entity));
+-        return entity.world.rayTraceBlocks(new RayTraceContext(start, end, RayTraceContext.BlockMode.OUTLINE, RayTraceContext.FluidMode.NONE, entity));
++        return entity.world.rayTraceBlocks(new RayTraceContext(start, end, RayTraceContext.BlockMode.OUTLINE, fluidHandling, entity));
      }
  
-     public static Vec3 inferSneakingEyePosition(Entity entity) {
+     public static Vector3d inferSneakingEyePosition(Entity entity) {
 diff --git a/src/main/java/baritone/behavior/InventoryBehavior.java b/src/main/java/baritone/behavior/InventoryBehavior.java
 index 43a553d4..9fc9d740 100644
 --- a/src/main/java/baritone/behavior/InventoryBehavior.java
@@ -66,8 +66,8 @@ index 43a553d4..9fc9d740 100644
  import baritone.Baritone;
 +import baritone.altoclef.AltoClefSettings;
  import baritone.api.event.events.TickEvent;
+ import baritone.api.utils.Helper;
  import baritone.utils.ToolSet;
- import net.minecraft.client.player.LocalPlayer;
 @@ -54,7 +55,7 @@ public final class InventoryBehavior extends Behavior implements Helper {
  
      @Override
@@ -80,24 +80,24 @@ index 43a553d4..9fc9d740 100644
 @@ -79,6 +80,8 @@ public final class InventoryBehavior extends Behavior implements Helper {
      }
  
-     public void attemptToPutOnHotbar(int inMainInvy, Predicate<Integer> disallowedHotbar) {
-+        if (AltoClefSettings.getInstance().isInteractionPaused()) return;
+     public boolean attemptToPutOnHotbar(int inMainInvy, Predicate<Integer> disallowedHotbar) {
++        if (AltoClefSettings.getInstance().isInteractionPaused()) return false;
 +
          OptionalInt destination = getTempHotbarSlot(disallowedHotbar);
          if (destination.isPresent()) {
-             swapWithHotBar(inMainInvy, destination.getAsInt());
+             if (!requestSwapWithHotBar(inMainInvy, destination.getAsInt())) {
 @@ -119,6 +122,8 @@ public final class InventoryBehavior extends Behavior implements Helper {
-     }
- 
-     private void swapWithHotBar(int inInventory, int inHotbar) {
-+        if (AltoClefSettings.getInstance().isInteractionPaused()) return;
+             logDebug("Inventory move requested but delaying until stationary");
+             return false;
+         }
++        if (AltoClefSettings.getInstance().isInteractionPaused()) return false;
 +
-         ctx.playerController().windowClick(ctx.player().inventoryMenu.containerId, inInventory < 9 ? inInventory + 36 : inInventory, inHotbar, ClickType.SWAP, ctx.player());
-     }
- 
+         ctx.playerController().windowClick(ctx.player().container.windowId, inInventory < 9 ? inInventory + 36 : inInventory, inHotbar, ClickType.SWAP, ctx.player());
+         ticksSinceLastInventoryMove = 0;
+         lastTickRequestedMove = null;
 @@ -128,8 +133,12 @@ public final class InventoryBehavior extends Behavior implements Helper {
      private int firstValidThrowaway() { // TODO offhand idk
-         NonNullList<ItemStack> invy = ctx.player().getInventory().items;
+         NonNullList<ItemStack> invy = ctx.player().inventory.mainInventory;
          for (int i = 0; i < invy.size(); i++) {
 -            if (Baritone.settings().acceptableThrowawayItems.value.contains(invy.get(i).getItem())) {
 -                return i;
@@ -127,7 +127,7 @@ index 43a553d4..9fc9d740 100644
 +        if (AltoClefSettings.getInstance().shouldAvoidPlacingAt(x, y, z)) return false;
 +
          BlockState maybe = baritone.getBuilderProcess().placeAt(x, y, z, baritone.bsi.get0(x, y, z));
-         if (maybe != null && throwaway(select, stack -> stack.getItem() instanceof BlockItem && maybe.equals(((BlockItem) stack.getItem()).getBlock().getStateForPlacement(new BlockPlaceContext(new UseOnContext(ctx.world(), ctx.player(), InteractionHand.MAIN_HAND, stack, new BlockHitResult(new Vec3(ctx.player().position().x, ctx.player().position().y, ctx.player().position().z), Direction.UP, ctx.playerFeet(), false)) {}))))) {
+         if (maybe != null && throwaway(select, stack -> stack.getItem() instanceof BlockItem && maybe.equals(((BlockItem) stack.getItem()).getBlock().getStateForPlacement(new BlockItemUseContext(new ItemUseContext(ctx.world(), ctx.player(), Hand.MAIN_HAND, stack, new BlockRayTraceResult(new Vector3d(ctx.player().getPositionVec().x, ctx.player().getPositionVec().y, ctx.player().getPositionVec().z), Direction.UP, ctx.playerFeet(), false)) {}))))) {
              return true; // gotem
 @@ -176,6 +190,8 @@ public final class InventoryBehavior extends Behavior implements Helper {
              return true;
@@ -144,8 +144,8 @@ index 43a553d4..9fc9d740 100644
      public boolean throwaway(boolean select, Predicate<? super ItemStack> desired, boolean allowInventory) {
 +        if (AltoClefSettings.getInstance().isInteractionPaused()) return false;
 +
-         LocalPlayer p = ctx.player();
-         NonNullList<ItemStack> inv = p.getInventory().items;
+         ClientPlayerEntity p = ctx.player();
+         NonNullList<ItemStack> inv = p.inventory.mainInventory;
          for (int i = 0; i < 9; i++) {
 diff --git a/src/main/java/baritone/pathing/calc/PathNode.java b/src/main/java/baritone/pathing/calc/PathNode.java
 index 0911c6c0..320cbacb 100644
@@ -170,8 +170,8 @@ index 0911c6c0..320cbacb 100644
 +        }
 +        this.estimatedCostToGoal = AltoClefSettings.getInstance().applyGlobalHeuristic(originalCost, x, y, z);
          if (Double.isNaN(estimatedCostToGoal)) {
-             throw new IllegalStateException(String.format(
-                     "%s calculated implausible heuristic NaN at %s %s %s",
+             throw new IllegalStateException(goal + " calculated implausible heuristic");
+         }
 diff --git a/src/main/java/baritone/pathing/movement/CalculationContext.java b/src/main/java/baritone/pathing/movement/CalculationContext.java
 index e84188a7..2e05e6fd 100644
 --- a/src/main/java/baritone/pathing/movement/CalculationContext.java
@@ -185,21 +185,21 @@ index e84188a7..2e05e6fd 100644
  import baritone.api.pathing.movement.ActionCosts;
  import baritone.cache.WorldData;
 @@ -34,6 +35,7 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
- import net.minecraft.world.item.enchantment.Enchantments;
- import net.minecraft.world.level.Level;
- import net.minecraft.world.level.block.Block;
-+import net.minecraft.world.level.block.EndPortalFrameBlock;
- import net.minecraft.world.level.block.state.BlockState;
- 
- import java.util.ArrayList;
+ import baritone.utils.ToolSet;
+ import baritone.utils.pathing.BetterWorldBorder;
+ import net.minecraft.block.Block;
++import net.minecraft.block.EndPortalFrameBlock;
+ import net.minecraft.block.BlockState;
+ import net.minecraft.client.entity.player.ClientPlayerEntity;
+ import net.minecraft.enchantment.EnchantmentHelper;
 @@ -96,11 +98,11 @@ public class CalculationContext {
-         this.worldData = (WorldData) baritone.getWorldProvider().getCurrentWorld();
-         this.bsi = new BlockStateInterface(world, worldData, forUseOnAnotherThread);
+         this.worldData = (WorldData) baritone.getPlayerContext().worldData();
+         this.bsi = new BlockStateInterface(baritone.getPlayerContext(), forUseOnAnotherThread);
          this.toolSet = new ToolSet(player);
 -        this.hasThrowaway = Baritone.settings().allowPlace.value && ((Baritone) baritone).getInventoryBehavior().hasGenericThrowaway();
 +        this.hasThrowaway = !AltoClefSettings.getInstance().isInteractionPaused() && Baritone.settings().allowPlace.value && ((Baritone) baritone).getInventoryBehavior().hasGenericThrowaway();
-         this.hasWaterBucket = Baritone.settings().allowWaterBucketFall.value && Inventory.isHotbarSlot(player.getInventory().findSlotMatchingItem(STACK_BUCKET_WATER)) && world.dimension() != Level.NETHER;
-         this.canSprint = Baritone.settings().allowSprint.value && player.getFoodData().getFoodLevel() > 6;
+         this.hasWaterBucket = Baritone.settings().allowWaterBucketFall.value && PlayerInventory.isHotbar(player.inventory.getSlotFor(STACK_BUCKET_WATER)) && world.getDimensionKey() != World.THE_NETHER;
+         this.canSprint = Baritone.settings().allowSprint.value && player.getFoodStats().getFoodLevel() > 6;
          this.placeBlockCost = Baritone.settings().blockPlacementPenalty.value;
 -        this.allowBreak = Baritone.settings().allowBreak.value;
 +        this.allowBreak = !AltoClefSettings.getInstance().isInteractionPaused() && Baritone.settings().allowBreak.value;
@@ -208,7 +208,7 @@ index e84188a7..2e05e6fd 100644
          this.allowParkourPlace = Baritone.settings().allowParkourPlace.value;
 @@ -162,6 +164,9 @@ public class CalculationContext {
          if (!worldBorder.canPlaceAt(x, z)) {
-                     return COST_INF;
+             return COST_INF;
          }
 +        if (AltoClefSettings.getInstance().shouldAvoidPlacingAt(x, y, z)) {
 +            return COST_INF;
@@ -254,7 +254,7 @@ index 0fa326d5..1725b634 100644
          return Baritone.settings().blocksToDisallowBreaking.value.contains(b)
 +                || b instanceof EndPortalFrameBlock
                  || b == Blocks.ICE // ice becomes water, and water can mess up the path
--                || b instanceof InfestedBlock // obvious reasons
+-                || b instanceof SilverfishBlock // obvious reasons
                  // call context.get directly with x,y,z. no need to make 5 new BlockPos for no reason
                  || avoidAdjacentBreaking(bsi, x, y + 1, z, true)
                  || avoidAdjacentBreaking(bsi, x + 1, y, z, false)
@@ -287,7 +287,7 @@ index 0fa326d5..1725b634 100644
 @@ -388,6 +406,7 @@ public interface MovementHelper extends ActionCosts, Helper {
                  || block == Blocks.CACTUS
                  || block == Blocks.SWEET_BERRY_BUSH
-                 || block instanceof BaseFireBlock
+                 || block instanceof AbstractFireBlock
 +                || block instanceof EndPortalFrameBlock
                  || block == Blocks.END_PORTAL
                  || block == Blocks.COBWEB
@@ -342,8 +342,8 @@ index 07d6d7d0..769a8d6c 100644
              return true;
          }
          for (int y = 0; y <= 2; y++) { // we could hit any of the three blocks
--            if (MovementHelper.avoidWalkingInto(BlockStateInterface.get(ctx, into.above(y)))) {
-+            BlockPos p = into.above(y);
+-            if (MovementHelper.avoidWalkingInto(BlockStateInterface.get(ctx, into.up(y)))) {
++            BlockPos p = into.up(y);
 +            if (MovementHelper.avoidWalkingInto(BlockStateInterface.get(ctx, p))) {
 +                return true;
 +            }
@@ -366,10 +366,10 @@ index cb871175..b20b013d 100644
 @@ -95,7 +96,7 @@ public class MovementFall extends Movement {
          BlockState destState = ctx.world().getBlockState(dest);
          Block destBlock = destState.getBlock();
-         boolean isWater = destState.getFluidState().getType() instanceof WaterFluid;
+         boolean isWater = destState.getFluidState().getFluid() instanceof WaterFluid;
 -        if (!isWater && willPlaceBucket() && !playerFeet.equals(dest)) {
 +        if (!isWater && willPlaceBucket() && !playerFeet.equals(dest) && !AltoClefSettings.getInstance().shouldNotPlaceBucketButStillFall()) {
-             if (!Inventory.isHotbarSlot(ctx.player().getInventory().findSlotMatchingItem(STACK_BUCKET_WATER)) || ctx.world().dimension() == Level.NETHER) {
+             if (!PlayerInventory.isHotbar(ctx.player().inventory.getSlotFor(STACK_BUCKET_WATER)) || ctx.world().getDimensionKey() == World.THE_NETHER) {
                  return state.setStatus(MovementStatus.UNREACHABLE);
              }
 diff --git a/src/main/java/baritone/pathing/movement/movements/MovementTraverse.java b/src/main/java/baritone/pathing/movement/movements/MovementTraverse.java
@@ -392,15 +392,15 @@ index cec3ca39..74672d3d 100644
 +                return state;
 +            }
              // and we aren't already pressed up against the block
-             double dist = Math.max(Math.abs(ctx.player().position().x - (dest.getX() + 0.5D)), Math.abs(ctx.player().position().z - (dest.getZ() + 0.5D)));
+             double dist = Math.max(Math.abs(ctx.player().getPositionVec().x - (dest.getX() + 0.5D)), Math.abs(ctx.player().getPositionVec().z - (dest.getZ() + 0.5D)));
              if (dist < 0.83) {
 @@ -287,7 +291,7 @@ public class MovementTraverse extends Movement {
          } else {
              wasTheBridgeBlockAlwaysThere = false;
-             Block standingOn = BlockStateInterface.get(ctx, feet.below()).getBlock();
+             Block standingOn = BlockStateInterface.get(ctx, feet.down()).getBlock();
 -            if (standingOn.equals(Blocks.SOUL_SAND) || standingOn instanceof SlabBlock) { // see issue #118
 +            if ((standingOn.equals(Blocks.SOUL_SAND) && !AltoClefSettings.getInstance().shouldTreatSoulSandAsOrdinaryBlock()) || standingOn instanceof SlabBlock) { // see issue #118
-                 double dist = Math.max(Math.abs(dest.getX() + 0.5 - ctx.player().position().x), Math.abs(dest.getZ() + 0.5 - ctx.player().position().z));
+                 double dist = Math.max(Math.abs(dest.getX() + 0.5 - ctx.player().getPositionVec().x), Math.abs(dest.getZ() + 0.5 - ctx.player().getPositionVec().z));
                  if (dist < 0.85) { // 0.5 + 0.3 + epsilon
                      MovementHelper.moveTowards(ctx, state, dest);
 diff --git a/src/main/java/baritone/pathing/path/PathExecutor.java b/src/main/java/baritone/pathing/path/PathExecutor.java
@@ -416,14 +416,14 @@ index 96d10520..ab8a932d 100644
  import baritone.api.pathing.movement.ActionCosts;
  import baritone.api.pathing.movement.IMovement;
 @@ -561,6 +562,10 @@ public class PathExecutor implements IPathExecutor, Helper {
-         if (MovementHelper.avoidWalkingInto(ctx.world().getBlockState(current.getSrc().above(3)))) {
+         if (MovementHelper.avoidWalkingInto(ctx.world().getBlockState(current.getSrc().up(3)))) {
              return false;
          }
-+        if (AltoClefSettings.getInstance().shouldAvoidWalkThroughForce(current.getSrc().above(3))
-+                || AltoClefSettings.getInstance().shouldAvoidWalkThroughForce(current.getSrc().above(2))) {
++        if (AltoClefSettings.getInstance().shouldAvoidWalkThroughForce(current.getSrc().up(3))
++                || AltoClefSettings.getInstance().shouldAvoidWalkThroughForce(current.getSrc().up(2))) {
 +            return false;
 +        }
-         return !MovementHelper.avoidWalkingInto(ctx.world().getBlockState(next.getDest().above(2))); // codacy smh my head
+         return !MovementHelper.avoidWalkingInto(ctx.world().getBlockState(next.getDest().up(2))); // codacy smh my head
      }
  
 diff --git a/src/main/java/baritone/process/MineProcess.java b/src/main/java/baritone/process/MineProcess.java
@@ -435,28 +435,29 @@ index ff905c02..d8f25685 100644
  
  import baritone.Baritone;
 +import baritone.altoclef.AltoClefSettings;
+ import baritone.api.BaritoneAPI;
  import baritone.api.pathing.goals.*;
  import baritone.api.process.IMineProcess;
  import baritone.api.process.PathingCommand;
  import baritone.api.process.PathingCommandType;
- import baritone.api.utils.*;
 +import baritone.api.utils.Rotation;
+ import baritone.api.utils.*;
  import baritone.api.utils.input.Input;
  import baritone.cache.CachedChunk;
- import baritone.cache.WorldScanner;
  import baritone.pathing.movement.CalculationContext;
-@@ -35,10 +37,7 @@ import net.minecraft.core.BlockPos;
- import net.minecraft.world.entity.Entity;
- import net.minecraft.world.entity.item.ItemEntity;
- import net.minecraft.world.item.ItemStack;
--import net.minecraft.world.level.block.AirBlock;
--import net.minecraft.world.level.block.Block;
--import net.minecraft.world.level.block.Blocks;
--import net.minecraft.world.level.block.FallingBlock;
-+import net.minecraft.world.level.block.*;
- import net.minecraft.world.level.block.state.BlockState;
- 
- import java.util.*;
+@@ -30,11 +32,7 @@ import baritone.pathing.movement.CalculationContext;
+ import baritone.pathing.movement.MovementHelper;
+ import baritone.utils.BaritoneProcessHelper;
+ import baritone.utils.BlockStateInterface;
+-import net.minecraft.block.AirBlock;
+-import net.minecraft.block.Block;
+-import net.minecraft.block.Blocks;
+-import net.minecraft.block.BlockState;
+-import net.minecraft.block.FallingBlock;
++import net.minecraft.block.*;
+ import net.minecraft.client.world.ClientWorld;
+ import net.minecraft.entity.Entity;
+ import net.minecraft.entity.item.ItemEntity;
 @@ -100,6 +99,10 @@ public final class MineProcess extends BaritoneProcessHelper implements IMinePro
                  return null;
              }
@@ -483,7 +484,7 @@ index ff905c02..d8f25685 100644
  
 -        if (!untracked.isEmpty() || (Baritone.settings().extendCacheOnThreshold.value && locs.size() < max)) {
 +        if (!untracked.isEmpty() || (Baritone.settings().extendCacheOnThreshold.value && locs.size() < maxTotal)) {
-             locs.addAll(WorldScanner.INSTANCE.scanChunkRadius(
+             locs.addAll(BaritoneAPI.getProvider().getWorldScanner().scanChunkRadius(
                      ctx.getBaritone().getPlayerContext(),
                      filter,
 @@ -488,7 +486,17 @@ public final class MineProcess extends BaritoneProcessHelper implements IMinePro
@@ -538,24 +539,24 @@ index ed4b166c..a40ef0fb 100644
  
  import baritone.Baritone;
 +import baritone.altoclef.AltoClefSettings;
- import net.minecraft.client.player.LocalPlayer;
- import net.minecraft.world.effect.MobEffects;
- import net.minecraft.world.item.ItemStack;
+ import net.minecraft.block.Block;
+ import net.minecraft.block.BlockState;
+ import net.minecraft.client.entity.player.ClientPlayerEntity;
 @@ -114,6 +115,8 @@ public class ToolSet {
          If we actually want know what efficiency our held item has instead of the best one
          possible, this lets us make pathing depend on the actual tool to be used (if auto tool is disabled)
          */
-+        if (b.getExplosionResistance() == 0) return(player.getInventory().selected);
++        if (b.getExplosionResistance() == 0) return(player.inventory.currentItem);
 +
          if (!Baritone.settings().autoTool.value && pathingCalculation) {
-             return player.getInventory().selected;
+             return player.inventory.currentItem;
          }
 @@ -128,10 +131,12 @@ public class ToolSet {
              if (!Baritone.settings().useSwordToMine.value && itemStack.getItem() instanceof SwordItem) {
                  continue;
              }
 -
-             if (Baritone.settings().itemSaver.value && (itemStack.getDamageValue() + Baritone.settings().itemSaverThreshold.value) >= itemStack.getMaxDamage() && itemStack.getMaxDamage() > 1) {
+             if (Baritone.settings().itemSaver.value && (itemStack.getDamage() + Baritone.settings().itemSaverThreshold.value) >= itemStack.getMaxDamage() && itemStack.getMaxDamage() > 1) {
                  continue;
              }
 +            if (AltoClefSettings.getInstance().shouldForceSaveTool(blockState, itemStack)) {
@@ -573,7 +574,7 @@ index ed4b166c..a40ef0fb 100644
 +            return Double.POSITIVE_INFINITY;
 +        }
          speed /= hardness;
-         if (!state.requiresCorrectToolForDrops() || (!item.isEmpty() && item.isCorrectToolForDrops(state))) {
+         if (!state.getRequiresTool() || (!item.isEmpty() && item.canHarvestBlock(state))) {
              return speed / 30;
 -- 
 2.45.1.windows.1
