@@ -533,7 +533,7 @@ index ed4b166c..a40ef0fb 100644
 +import baritone.altoclef.AltoClefSettings;
  import net.minecraft.client.player.LocalPlayer;
  import net.minecraft.core.Holder;
- import net.minecraft.world.effect.MobEffects;
+ import net.minecraft.tags.ItemTags;
 @@ -114,6 +115,8 @@ public class ToolSet {
          If we actually want know what efficiency our held item has instead of the best one
          possible, this lets us make pathing depend on the actual tool to be used (if auto tool is disabled)
