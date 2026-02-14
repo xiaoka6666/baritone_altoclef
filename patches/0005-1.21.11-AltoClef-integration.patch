@@ -1,0 +1,477 @@
+diff --git a/src/api/java/baritone/api/process/IBuilderProcess.java b/src/api/java/baritone/api/process/IBuilderProcess.java
+index 67a3ed49..4aa09185 100644
+--- a/src/api/java/baritone/api/process/IBuilderProcess.java
++++ b/src/api/java/baritone/api/process/IBuilderProcess.java
+@@ -65,6 +65,10 @@ public interface IBuilderProcess extends IBaritoneProcess {
+ 
+     boolean isPaused();
+ 
++    void popStack();
++
++    boolean isFromAltoclefFinished();
++
+     void resume();
+ 
+     void clearArea(BlockPos corner1, BlockPos corner2);
+diff --git a/src/api/java/baritone/api/utils/RayTraceUtils.java b/src/api/java/baritone/api/utils/RayTraceUtils.java
+index 354f9c87..a9696fe1 100644
+--- a/src/api/java/baritone/api/utils/RayTraceUtils.java
++++ b/src/api/java/baritone/api/utils/RayTraceUtils.java
+@@ -31,6 +31,8 @@ public final class RayTraceUtils {
+ 
+     private RayTraceUtils() {}
+ 
++    public static ClipContext.Fluid fluidHandling = ClipContext.Fluid.NONE;
++
+     /**
+      * Performs a block raytrace with the specified rotations. This should only be used when
+      * any entity collisions can be ignored, because this method will not recognize if an
+@@ -59,7 +61,7 @@ public final class RayTraceUtils {
+                 direction.y * blockReachDistance,
+                 direction.z * blockReachDistance
+         );
+-        return entity.level().clip(new ClipContext(start, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, entity));
++        return entity.level().clip(new ClipContext(start, end, ClipContext.Block.OUTLINE, fluidHandling, entity));
+     }
+ 
+     public static Vec3 inferSneakingEyePosition(Entity entity) {
+diff --git a/src/main/java/baritone/altoclef/AltoClefSettings.java b/src/main/java/baritone/altoclef/AltoClefSettings.java
+new file mode 100644
+index 00000000..b5188e41
+--- /dev/null
++++ b/src/main/java/baritone/altoclef/AltoClefSettings.java
+@@ -0,0 +1,179 @@
++package baritone.altoclef;
++
++import net.minecraft.core.BlockPos;
++import net.minecraft.world.item.Item;
++import net.minecraft.world.item.ItemStack;
++import net.minecraft.world.level.block.state.BlockState;
++
++import java.util.HashSet;
++import java.util.Set;
++import java.util.function.Consumer;
++
++/**
++ * AltoClef settings integration for Baritone.
++ * This class provides hooks for AltoClef to control Baritone behavior.
++ */
++public class AltoClefSettings {
++
++    private static AltoClefSettings instance;
++
++    private boolean interactionPaused = false;
++    private final Set<Item> protectedItems = new HashSet<>();
++    private final Set<BlockPos> avoidBreaking = new HashSet<>();
++    private final Set<BlockPos> avoidPlacing = new HashSet<>();
++    private final Set<BlockPos> avoidWalkThrough = new HashSet<>();
++    private boolean canSwimThroughLava = false;
++    private boolean canWalkOnEndPortal = false;
++    private boolean notPlaceBucketButStillFall = false;
++    private boolean treatSoulSandAsOrdinaryBlock = false;
++    private Consumer<Double> heuristicModifier = null;
++
++    private AltoClefSettings() {}
++
++    public static AltoClefSettings getInstance() {
++        if (instance == null) {
++            instance = new AltoClefSettings();
++        }
++        return instance;
++    }
++
++    public boolean isInteractionPaused() {
++        return interactionPaused;
++    }
++
++    public void setInteractionPaused(boolean paused) {
++        this.interactionPaused = paused;
++    }
++
++    public boolean isItemProtected(Item item) {
++        return protectedItems.contains(item);
++    }
++
++    public void protectItem(Item item) {
++        protectedItems.add(item);
++    }
++
++    public void unprotectItem(Item item) {
++        protectedItems.remove(item);
++    }
++
++    public void clearProtectedItems() {
++        protectedItems.clear();
++    }
++
++    public boolean shouldAvoidBreaking(BlockPos pos) {
++        return avoidBreaking.contains(pos);
++    }
++
++    public void addAvoidBreaking(BlockPos pos) {
++        avoidBreaking.add(pos.immutable());
++    }
++
++    public void removeAvoidBreaking(BlockPos pos) {
++        avoidBreaking.remove(pos);
++    }
++
++    public void clearAvoidBreaking() {
++        avoidBreaking.clear();
++    }
++
++    public boolean shouldAvoidPlacingAt(int x, int y, int z) {
++        return avoidPlacing.contains(new BlockPos(x, y, z));
++    }
++
++    public void addAvoidPlacing(BlockPos pos) {
++        avoidPlacing.add(pos.immutable());
++    }
++
++    public void removeAvoidPlacing(BlockPos pos) {
++        avoidPlacing.remove(pos);
++    }
++
++    public void clearAvoidPlacing() {
++        avoidPlacing.clear();
++    }
++
++    public boolean shouldAvoidWalkThroughForce(BlockPos pos) {
++        return avoidWalkThrough.contains(pos);
++    }
++
++    public boolean shouldAvoidWalkThroughForce(int x, int y, int z) {
++        return shouldAvoidWalkThroughForce(new BlockPos(x, y, z));
++    }
++
++    public void addAvoidWalkThrough(BlockPos pos) {
++        avoidWalkThrough.add(pos.immutable());
++    }
++
++    public void removeAvoidWalkThrough(BlockPos pos) {
++        avoidWalkThrough.remove(pos);
++    }
++
++    public void clearAvoidWalkThrough() {
++        avoidWalkThrough.clear();
++    }
++
++    public boolean canSwimThroughLava() {
++        return canSwimThroughLava;
++    }
++
++    public void setCanSwimThroughLava(boolean canSwim) {
++        this.canSwimThroughLava = canSwim;
++    }
++
++    public boolean isCanWalkOnEndPortal() {
++        return canWalkOnEndPortal;
++    }
++
++    public void setCanWalkOnEndPortal(boolean canWalk) {
++        this.canWalkOnEndPortal = canWalk;
++    }
++
++    public boolean shouldNotPlaceBucketButStillFall() {
++        return notPlaceBucketButStillFall;
++    }
++
++    public void setNotPlaceBucketButStillFall(boolean value) {
++        this.notPlaceBucketButStillFall = value;
++    }
++
++    public boolean shouldTreatSoulSandAsOrdinaryBlock() {
++        return treatSoulSandAsOrdinaryBlock;
++    }
++
++    public void setTreatSoulSandAsOrdinaryBlock(boolean value) {
++        this.treatSoulSandAsOrdinaryBlock = value;
++    }
++
++    public double applyGlobalHeuristic(double originalCost, int x, int y, int z) {
++        if (heuristicModifier != null) {
++            heuristicModifier.accept(originalCost);
++        }
++        return originalCost;
++    }
++
++    public void setHeuristicModifier(Consumer<Double> modifier) {
++        this.heuristicModifier = modifier;
++    }
++
++    public boolean shouldForceSaveTool(BlockState blockState, ItemStack itemStack) {
++        return false;
++    }
++
++    public boolean shouldForceUseTool(BlockState state, Item item) {
++        return false;
++    }
++
++    public void reset() {
++        interactionPaused = false;
++        protectedItems.clear();
++        avoidBreaking.clear();
++        avoidPlacing.clear();
++        avoidWalkThrough.clear();
++        canSwimThroughLava = false;
++        canWalkOnEndPortal = false;
++        notPlaceBucketButStillFall = false;
++        treatSoulSandAsOrdinaryBlock = false;
++        heuristicModifier = null;
++    }
++}
+diff --git a/src/main/java/baritone/behavior/InventoryBehavior.java b/src/main/java/baritone/behavior/InventoryBehavior.java
+index 15dff73e..dc31a966 100644
+--- a/src/main/java/baritone/behavior/InventoryBehavior.java
++++ b/src/main/java/baritone/behavior/InventoryBehavior.java
+@@ -18,6 +18,7 @@
+ package baritone.behavior;
+ 
+ import baritone.Baritone;
++import baritone.altoclef.AltoClefSettings;
+ import baritone.api.event.events.TickEvent;
+ import baritone.api.utils.Helper;
+ import baritone.utils.ToolSet;
+@@ -55,7 +56,7 @@ public final class InventoryBehavior extends Behavior implements Helper {
+ 
+     @Override
+     public void onTick(TickEvent event) {
+-        if (!Baritone.settings().allowInventory.value) {
++        if (!Baritone.settings().allowInventory.value || AltoClefSettings.getInstance().isInteractionPaused()) {
+             return;
+         }
+         if (event.getType() == TickEvent.Type.OUT) {
+@@ -80,6 +81,8 @@ public final class InventoryBehavior extends Behavior implements Helper {
+     }
+ 
+     public boolean attemptToPutOnHotbar(int inMainInvy, Predicate<Integer> disallowedHotbar) {
++        if (AltoClefSettings.getInstance().isInteractionPaused()) return false;
++
+         OptionalInt destination = getTempHotbarSlot(disallowedHotbar);
+         if (destination.isPresent()) {
+             if (!requestSwapWithHotBar(inMainInvy, destination.getAsInt())) {
+@@ -120,6 +123,8 @@ public final class InventoryBehavior extends Behavior implements Helper {
+             logDebug("Inventory move requested but delaying until stationary");
+             return false;
+         }
++        if (AltoClefSettings.getInstance().isInteractionPaused()) return false;
++
+         ctx.playerController().windowClick(ctx.player().inventoryMenu.containerId, inInventory < 9 ? inInventory + 36 : inInventory, inHotbar, ClickType.SWAP, ctx.player());
+         ticksSinceLastInventoryMove = 0;
+         lastTickRequestedMove = null;
+@@ -129,8 +134,12 @@ public final class InventoryBehavior extends Behavior implements Helper {
+     private int firstValidThrowaway() { // TODO offhand idk
+         NonNullList<ItemStack> invy = ctx.player().getInventory().getNonEquipmentItems();
+         for (int i = 0; i < invy.size(); i++) {
+-            if (Baritone.settings().acceptableThrowawayItems.value.contains(invy.get(i).getItem())) {
+-                return i;
++            Item item = invy.get(i).getItem();
++
++            if (Baritone.settings().acceptableThrowawayItems.value.contains(item)) {
++                if (!AltoClefSettings.getInstance().isItemProtected(item)) {
++                    return i;
++                }
+             }
+         }
+         return -1;
+@@ -161,6 +170,8 @@ public final class InventoryBehavior extends Behavior implements Helper {
+ 
+     public boolean hasGenericThrowaway() {
+         for (Item item : Baritone.settings().acceptableThrowawayItems.value) {
++            if (AltoClefSettings.getInstance().isItemProtected(item)) continue;
++
+             if (throwaway(false, stack -> item.equals(stack.getItem()))) {
+                 return true;
+             }
+@@ -169,6 +180,9 @@ public final class InventoryBehavior extends Behavior implements Helper {
+     }
+ 
+     public boolean selectThrowawayForLocation(boolean select, int x, int y, int z) {
++        if (AltoClefSettings.getInstance().isInteractionPaused()) return false;
++        if (AltoClefSettings.getInstance().shouldAvoidPlacingAt(x, y, z)) return false;
++
+         BlockState maybe = baritone.getBuilderProcess().placeAt(x, y, z, baritone.bsi.get0(x, y, z));
+         if (maybe != null && throwaway(select, stack -> stack.getItem() instanceof BlockItem && maybe.equals(((BlockItem) stack.getItem()).getBlock().getStateForPlacement(new BlockPlaceContext(new UseOnContext(ctx.world(), ctx.player(), InteractionHand.MAIN_HAND, stack, new BlockHitResult(new Vec3(ctx.player().position().x, ctx.player().position().y, ctx.player().position().z), Direction.UP, ctx.playerFeet(), false)) {}))))) {
+             return true; // gotem
+@@ -177,6 +191,8 @@ public final class InventoryBehavior extends Behavior implements Helper {
+             return true;
+         }
+         for (Item item : Baritone.settings().acceptableThrowawayItems.value) {
++            if (AltoClefSettings.getInstance().isItemProtected(item)) continue;
++
+             if (throwaway(select, stack -> item.equals(stack.getItem()))) {
+                 return true;
+             }
+@@ -189,6 +205,8 @@ public final class InventoryBehavior extends Behavior implements Helper {
+     }
+ 
+     public boolean throwaway(boolean select, Predicate<? super ItemStack> desired, boolean allowInventory) {
++        if (AltoClefSettings.getInstance().isInteractionPaused()) return false;
++
+         LocalPlayer p = ctx.player();
+         NonNullList<ItemStack> inv = p.getInventory().getNonEquipmentItems();
+         for (int i = 0; i < 9; i++) {
+diff --git a/src/main/java/baritone/pathing/calc/PathNode.java b/src/main/java/baritone/pathing/calc/PathNode.java
+index 0911c6c0..320cbacb 100644
+--- a/src/main/java/baritone/pathing/calc/PathNode.java
++++ b/src/main/java/baritone/pathing/calc/PathNode.java
+@@ -17,6 +17,7 @@
+ 
+ package baritone.pathing.calc;
+ 
++import baritone.altoclef.AltoClefSettings;
+ import baritone.api.pathing.goals.Goal;
+ import baritone.api.pathing.movement.ActionCosts;
+ import baritone.api.utils.BetterBlockPos;
+@@ -67,7 +68,11 @@ public final class PathNode {
+     public PathNode(int x, int y, int z, Goal goal) {
+         this.previous = null;
+         this.cost = ActionCosts.COST_INF;
+-        this.estimatedCostToGoal = goal.heuristic(x, y, z);
++        double originalCost = goal.heuristic(x, y, z);
++        if (Double.isNaN(originalCost)) {
++            throw new IllegalStateException(goal + " calculated implausible heuristic");
++        }
++        this.estimatedCostToGoal = AltoClefSettings.getInstance().applyGlobalHeuristic(originalCost, x, y, z);
+         if (Double.isNaN(estimatedCostToGoal)) {
+             throw new IllegalStateException(String.format(
+                     "%s calculated implausible heuristic NaN at %s %s %s",
+diff --git a/src/main/java/baritone/pathing/movement/CalculationContext.java b/src/main/java/baritone/pathing/movement/CalculationContext.java
+index f616c983..c6818e01 100644
+--- a/src/main/java/baritone/pathing/movement/CalculationContext.java
++++ b/src/main/java/baritone/pathing/movement/CalculationContext.java
+@@ -18,6 +18,7 @@
+ package baritone.pathing.movement;
+ 
+ import baritone.Baritone;
++import baritone.altoclef.AltoClefSettings;
+ import baritone.api.IBaritone;
+ import baritone.api.pathing.movement.ActionCosts;
+ import baritone.cache.WorldData;
+@@ -37,6 +38,7 @@ import net.minecraft.world.item.enchantment.*;
+ import net.minecraft.world.item.enchantment.effects.EnchantmentAttributeEffect;
+ import net.minecraft.world.level.Level;
+ import net.minecraft.world.level.block.Block;
++import net.minecraft.world.level.block.EndPortalFrameBlock;
+ import net.minecraft.world.level.block.state.BlockState;
+ 
+ import java.util.ArrayList;
+diff --git a/src/main/java/baritone/pathing/movement/Movement.java b/src/main/java/baritone/pathing/movement/Movement.java
+index 739c8ee8..1b4e6d3e 100644
+--- a/src/main/java/baritone/pathing/movement/Movement.java
++++ b/src/main/java/baritone/pathing/movement/Movement.java
+@@ -18,6 +18,7 @@
+ package baritone.pathing.movement;
+ 
+ import baritone.Baritone;
++import baritone.altoclef.AltoClefSettings;
+ import baritone.api.IBaritone;
+ import baritone.api.pathing.movement.IMovement;
+ import baritone.api.pathing.movement.MovementStatus;
+@@ -263,6 +264,9 @@ public abstract class Movement implements IMovement, MovementHelper {
+         }
+         List<BlockPos> result = new ArrayList<>();
+         for (BetterBlockPos positionToBreak : positionsToBreak) {
++            if (AltoClefSettings.getInstance().shouldAvoidBreaking(positionToBreak)) {
++                continue;
++            }
+             if (!MovementHelper.canWalkThrough(bsi, positionToBreak.x, positionToBreak.y, positionToBreak.z)) {
+                 result.add(positionToBreak);
+             }
+diff --git a/src/main/java/baritone/pathing/movement/MovementHelper.java b/src/main/java/baritone/pathing/movement/MovementHelper.java
+index d6de3c74..3e2618b3 100644
+--- a/src/main/java/baritone/pathing/movement/MovementHelper.java
++++ b/src/main/java/baritone/pathing/movement/MovementHelper.java
+@@ -18,6 +18,7 @@
+ package baritone.pathing.movement;
+ 
+ import baritone.Baritone;
++import baritone.altoclef.AltoClefSettings;
+ import baritone.api.BaritoneAPI;
+ import baritone.api.IBaritone;
+ import baritone.api.pathing.movement.ActionCosts;
+@@ -143,7 +144,7 @@ public interface MovementHelper extends ActionCosts, Helper {
+         if (block instanceof AirBlock) {
+             return YES;
+         }
+-        if (block instanceof BaseFireBlock || block == Blocks.COBWEB || block == Blocks.END_PORTAL || block == Blocks.COCOA || block instanceof AbstractSkullBlock || block == Blocks.BUBBLE_COLUMN || block instanceof ShulkerBoxBlock || block instanceof SlabBlock || block instanceof TrapDoorBlock || block == Blocks.HONEY_BLOCK || block == Blocks.END_ROD || block == Blocks.SWEET_BERRY_BUSH || block == Blocks.POINTED_DRIPSTONE || block instanceof AmethystClusterBlock || block instanceof AzaleaBlock) {
++        if (block instanceof BaseFireBlock || block == Blocks.COBWEB || (block == Blocks.END_PORTAL && !AltoClefSettings.getInstance().isCanWalkOnEndPortal()) || block == Blocks.COCOA || block instanceof AbstractSkullBlock || block == Blocks.BUBBLE_COLUMN || block instanceof ShulkerBoxBlock || block instanceof SlabBlock || block instanceof TrapDoorBlock || block == Blocks.HONEY_BLOCK || block == Blocks.END_ROD || block == Blocks.SWEET_BERRY_BUSH || block == Blocks.POINTED_DRIPSTONE || block instanceof AmethystClusterBlock || block instanceof AzaleaBlock) {
+             return NO;
+         }
+         if (block == Blocks.BIG_DRIPLEAF) {
+@@ -189,6 +190,10 @@ public interface MovementHelper extends ActionCosts, Helper {
+     }
+ 
+     static boolean canWalkThroughPosition(BlockStateInterface bsi, int x, int y, int z, BlockState state) {
++        if (AltoClefSettings.getInstance().shouldAvoidWalkThroughForce(x, y, z)) {
++            return false;
++        }
++
+         Block block = state.getBlock();
+ 
+         if (block instanceof CarpetBlock) {
+@@ -436,7 +441,7 @@ public interface MovementHelper extends ActionCosts, Helper {
+         if (isWater(state)) {
+             return MAYBE;
+         }
+-        if (MovementHelper.isLava(state) && Baritone.settings().assumeWalkOnLava.value) {
++        if (MovementHelper.isLava(state) && (Baritone.settings().assumeWalkOnLava.value || AltoClefSettings.getInstance().canSwimThroughLava())) {
+             return MAYBE;
+         }
+         if (block instanceof SlabBlock) {
+@@ -470,7 +475,7 @@ public interface MovementHelper extends ActionCosts, Helper {
+             return isWater(upState) ^ Baritone.settings().assumeWalkOnWater.value;
+         }
+ 
+-        if (MovementHelper.isLava(state) && !MovementHelper.isFlowing(x, y, z, state, bsi) && Baritone.settings().assumeWalkOnLava.value) { // if we get here it means that assumeWalkOnLava must be true, so put it last
++        if (MovementHelper.isLava(state) && !MovementHelper.isFlowing(x, y, z, state, bsi) && (Baritone.settings().assumeWalkOnLava.value || AltoClefSettings.getInstance().canSwimThroughLava())) { // if we get here it means that assumeWalkOnLava must be true, so put it last
+             return true;
+         }
+ 
+diff --git a/src/main/java/baritone/pathing/movement/movements/MovementTraverse.java b/src/main/java/baritone/pathing/movement/movements/MovementTraverse.java
+index 122c6bfe..b22ae0b8 100644
+--- a/src/main/java/baritone/pathing/movement/movements/MovementTraverse.java
++++ b/src/main/java/baritone/pathing/movement/movements/MovementTraverse.java
+@@ -18,6 +18,7 @@
+ package baritone.pathing.movement.movements;
+ 
+ import baritone.Baritone;
++import baritone.altoclef.AltoClefSettings;
+ import baritone.api.IBaritone;
+ import baritone.api.pathing.movement.MovementStatus;
+ import baritone.api.utils.BetterBlockPos;
+diff --git a/src/main/java/baritone/process/BuilderProcess.java b/src/main/java/baritone/process/BuilderProcess.java
+index 29a0c7d6..9f4d8ceb 100644
+--- a/src/main/java/baritone/process/BuilderProcess.java
++++ b/src/main/java/baritone/process/BuilderProcess.java
+@@ -166,6 +166,18 @@ public final class BuilderProcess extends BaritoneProcessHelper implements IBuil
+         paused = true;
+     }
+ 
++    public void popStack() {
++        if (this.schematic != null) {
++            this.schematic = null;
++            this.origin = null;
++            this.incorrectPositions = null;
++        }
++    }
++
++    public boolean isFromAltoclefFinished() {
++        return this.schematic == null;
++    }
++
+     @Override
+     public boolean isPaused() {
+         return paused;
+diff --git a/src/main/java/baritone/utils/ToolSet.java b/src/main/java/baritone/utils/ToolSet.java
+index 80981174..a9378df8 100644
+--- a/src/main/java/baritone/utils/ToolSet.java
++++ b/src/main/java/baritone/utils/ToolSet.java
+@@ -18,6 +18,7 @@
+ package baritone.utils;
+ 
+ import baritone.Baritone;
++import baritone.altoclef.AltoClefSettings;
+ import net.minecraft.client.player.LocalPlayer;
+ import net.minecraft.core.Holder;
+ import net.minecraft.core.component.DataComponents;
